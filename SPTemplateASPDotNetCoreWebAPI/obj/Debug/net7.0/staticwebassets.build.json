@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "UwJSCotQPNbH9EOZrv0Y28mPSAtLhjdbJr/l+RrosoM=",
+  "Source": "SPTemplateASPDotNetCoreWebAPI",
+  "BasePath": "_content/SPTemplateASPDotNetCoreWebAPI",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
