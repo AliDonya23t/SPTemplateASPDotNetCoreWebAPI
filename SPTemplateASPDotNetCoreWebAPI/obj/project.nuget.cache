@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "5vgsXUXkxcTW0GkzHFlIcIfZKl/4uxjODXTJZIeAnMZxDKK/jLkuqHR6pR8KnqmM8iMVJDw/68OKFOtH9VoXiA==",
+  "dgSpecHash": "cq/+XrvDOs3rPtiwgRlyAsIQsQrtBASVRRoM8oaE0q6bDLGV7EBwlNU5s4W1nNrW2FEZs2FegKxkWvclCsyA4w==",
   "success": true,
-  "projectFilePath": "C:\\Users\\Ali.D\\Source\\Repos\\SPTemplateASPDotNetCoreWebAPI\\SPTemplateASPDotNetCoreWebAPI\\SPTemplateASPDotNetCoreWebAPI.csproj",
+  "projectFilePath": "C:\\Users\\Ali.D\\source\\repos\\SPTemplateASPDotNetCoreWebAPI\\SPTemplateASPDotNetCoreWebAPI\\SPTemplateASPDotNetCoreWebAPI.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Ali.D\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\Ali.D\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\7.0.9\\microsoft.aspnetcore.authentication.jwtbearer.7.0.9.nupkg.sha512",
