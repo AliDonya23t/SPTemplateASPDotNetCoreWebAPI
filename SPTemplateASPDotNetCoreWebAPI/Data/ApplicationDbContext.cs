@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using SPTemplateASPDotNetCoreWebAPI.Models;
+
 namespace SPTemplateASPDotNetCoreWebAPI.Data
 {
     public class ApplicationDbContext : DbContext
@@ -12,6 +14,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Data
         {
         }
 
+        public DbSet<User> Registers { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

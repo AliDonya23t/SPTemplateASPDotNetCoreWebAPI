@@ -9,6 +9,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using SPTemplateASPDotNetCoreWebAPI.Services;
+using SPTemplateASPDotNetCoreWebAPI.Data;
 
 namespace SPTemplateASPDotNetCoreWebAPI.Controllers
 {
@@ -17,6 +18,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
     public class AuthController : ControllerBase
     {
         public static User user = new User();
+        //private readonly ApplicationDbContext user;
         private readonly IConfiguration _configuration;
         private readonly IUserService _userService;
 
@@ -24,6 +26,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
         {
             _configuration = configuration;
             _userService = userService;
+            //_db = db;
         }
         //[Authorize]
         [Authorize(Roles = "Admin")]
@@ -38,17 +41,26 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
         public async Task<ActionResult<User>> Register(UserDto request)
         {
             CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
-
+            //User user = new User();
             user.Username = request.Username;
             user.PasswordHash = passwordHash;
             user.PasswordSalt = passwordSalt;
+            //try
+            //{
+            //    //_db.Add(0);
+            //}
+            //catch (Exception e)
+            //{
+
+            //    throw;
+            //}
 
             return Ok(user);
         }
         [HttpPost("login")]
         public async Task<ActionResult<string>> Login(UserDto request)
         {
-            if (user.Username != request.Username)
+            if (user.Username.ToUpper() != request.Username.ToUpper())
             {
                 return BadRequest("User not found.");
             }
@@ -67,7 +79,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
         }
         [HttpPost("refresh-token")]
         // login with token  then refresh, now you have to enter with the refreshed token next time
-        public async Task<ActionResult<string>> RefreshToken() 
+        public async Task<ActionResult<string>> RefreshToken()
         {
             var refreshToken = Request.Cookies["refreshToken"];
 
@@ -91,7 +103,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
             var refreshToken = new RefreshToken
             {
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Expires = DateTime.Now.AddDays(7),
+                Expires = DateTime.Now.AddMinutes(60),
                 Created = DateTime.Now
             };
 
