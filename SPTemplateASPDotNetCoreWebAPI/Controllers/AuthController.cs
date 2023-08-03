@@ -8,8 +8,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
-using SPTemplateASPDotNetCoreWebAPI.Services;
-using SPTemplateASPDotNetCoreWebAPI.Data;
+using System.Net;
+using SPTemplateASPDotNetCoreWebAPI.Repository.IRepository;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace SPTemplateASPDotNetCoreWebAPI.Controllers
 {
@@ -17,151 +18,103 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        public static User user = new User();
-        //private readonly ApplicationDbContext user;
-        private readonly IConfiguration _configuration;
-        private readonly IUserService _userService;
-
-        public AuthController(IConfiguration configuration, IUserService userService)
+        
+        private readonly IUserRepository _userRepo;
+        protected APIResponse _response;
+        public AuthController(IUserRepository userRepo)
         {
-            _configuration = configuration;
-            _userService = userService;
-            //_db = db;
+            _userRepo = userRepo;
+            _response = new();
         }
-        //[Authorize]
         [Authorize(Roles = "Admin")]
         [HttpGet]
 
         public ActionResult<string> GetMe()
         {
-            var userName = _userService.GetMyName();
+            var userName = _userRepo.GetMyName();
             return Ok(userName);
         }
-        [HttpPost("Register")]
-        public async Task<ActionResult<User>> Register(UserDto request)
+        
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterationRequestDto model)
         {
-            CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
-            //User user = new User();
-            user.Username = request.Username;
-            user.PasswordHash = passwordHash;
-            user.PasswordSalt = passwordSalt;
-            //try
-            //{
-            //    //_db.Add(0);
-            //}
-            //catch (Exception e)
-            //{
+            bool ifUserNameUnique = _userRepo.IsUniqueUser(model.UserName);
+            if (!ifUserNameUnique)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.ErrorMessages.Add("Username already exists");
+                return BadRequest(_response);
+            }
 
-            //    throw;
-            //}
-
-            return Ok(user);
+            var user = await _userRepo.Register(model);
+            if (user is null)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.ErrorMessages.Add("Error while registering");
+                return BadRequest(_response);
+            }
+            _response.StatusCode = HttpStatusCode.OK;
+            _response.IsSuccess = true;
+            return Ok(_response);
         }
+
         [HttpPost("login")]
-        public async Task<ActionResult<string>> Login(UserDto request)
+        public async Task<IActionResult> Login([FromBody] LoginRequestDto model)
         {
-            if (user.Username.ToUpper() != request.Username.ToUpper())
+            var loginResponse = await _userRepo.Login(model);
+            if (loginResponse.User == null || string.IsNullOrEmpty(loginResponse.Token))
             {
-                return BadRequest("User not found.");
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.ErrorMessages.Add("Username or password is incorrect");
+                return BadRequest(_response);
             }
+            SetRefreshTokenInCookie(loginResponse.Token);
+            _response.StatusCode = HttpStatusCode.OK;
+            _response.IsSuccess = true;
+            _response.Result = loginResponse;
+            return Ok(_response);
+        }
 
-            if (!VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
-            {
-                return BadRequest("Wrong password.");
-            }
-
-            string token = CreateToken(user);
-
-            var refreshToken = GenerateRefreshToken();
-            SetRefreshToken(refreshToken);
-
-            return Ok(token);
+        [HttpPost("token")]
+        public async Task<IActionResult> GetTokenAsync(UserDto model)
+        {
+            var result = await _userRepo.GetTokenAsync(model);
+            SetRefreshTokenInCookie(result.RefreshToken);
+            return Ok(result);
         }
         [HttpPost("refresh-token")]
         // login with token  then refresh, now you have to enter with the refreshed token next time
-        public async Task<ActionResult<string>> RefreshToken()
+        public async Task<IActionResult> RefreshToken()
         {
             var refreshToken = Request.Cookies["refreshToken"];
-
-            if (!user.RefreshToken.Equals(refreshToken))
+            var RefreshTokenresponse = await _userRepo.RefreshTokenAsync(refreshToken);
+            if (RefreshTokenresponse is null || RefreshTokenresponse.IsAuthenticated is false)
             {
-                return Unauthorized("Invalid Refresh Token.");
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.ErrorMessages.Add("Error while registering-"+ RefreshTokenresponse.Message);
+                return BadRequest(_response);
             }
-            else if (user.TokenExpires < DateTime.Now)
-            {
-                return Unauthorized("Token expired.");
-            }
-
-            string token = CreateToken(user);
-            var newRefreshToken = GenerateRefreshToken();
-            SetRefreshToken(newRefreshToken);
-
-            return Ok(token);
+            if (!string.IsNullOrEmpty(RefreshTokenresponse.RefreshToken))
+                SetRefreshTokenInCookie(RefreshTokenresponse.RefreshToken);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Result = RefreshTokenresponse;
+            return Ok(_response);
         }
-        private RefreshToken GenerateRefreshToken()
-        {
-            var refreshToken = new RefreshToken
-            {
-                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Expires = DateTime.Now.AddMinutes(60),
-                Created = DateTime.Now
-            };
-
-            return refreshToken;
-        }
-        private void SetRefreshToken(RefreshToken newRefreshToken)
+        private void SetRefreshTokenInCookie(string refreshToken)
         {
             var cookieOptions = new CookieOptions
             {
                 HttpOnly = true,
-                Expires = newRefreshToken.Expires
+                Expires = DateTime.UtcNow.AddMinutes(60),
             };
-            Response.Cookies.Append("refreshToken", newRefreshToken.Token, cookieOptions);
-
-            user.RefreshToken = newRefreshToken.Token;
-            user.TokenCreated = newRefreshToken.Created;
-            user.TokenExpires = newRefreshToken.Expires;
-        }
-        private string CreateToken(User user)
-        {
-            List<Claim> claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, "Admin")
-            };
-
-            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8
-                .GetBytes(_configuration.GetSection("AppSettings:Token").Value));
-
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
-
-            var token = new JwtSecurityToken(
-                claims: claims,
-                expires: DateTime.Now.AddDays(1),
-                signingCredentials: creds);
-
-            var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-
-            return jwt;
+            Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
         }
 
 
-        private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
-        {
-            using (var hmac = new HMACSHA512())
-            {
-                passwordSalt = hmac.Key;
-                passwordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-            }
-        }
-        private bool VerifyPasswordHash(string password, byte[] passwordHash, byte[] passwordSalt)
-        {
-            //For check pass
-            using (var hmac = new HMACSHA512(passwordSalt))
-            {
-                var computedHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-                return computedHash.SequenceEqual(passwordHash);
-            }
-        }
     }
 }

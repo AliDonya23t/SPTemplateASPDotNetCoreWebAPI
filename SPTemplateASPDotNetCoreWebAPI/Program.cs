@@ -5,20 +5,22 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
-using SPTemplateASPDotNetCoreWebAPI.Services;
 using Microsoft.Extensions.Configuration;
+using SPTemplateASPDotNetCoreWebAPI;
+using SPTemplateASPDotNetCoreWebAPI.Repository.IRepository;
+using SPTemplateASPDotNetCoreWebAPI.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
+builder.Services.AddAutoMapper(typeof(MappingConfig));
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-//builder.Services.AddDbContext<ApplicationDbContext>(option => {
-//    option.UseSqlServer(builder.Configuration.GetConnectionString("DefaultSQLConnection"));
-//});
+builder.Services.AddDbContext<ApplicationDbContext>(option => {
+    option.UseSqlServer(builder.Configuration.GetConnectionString("DefaultSQLConnection"));
+});
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
