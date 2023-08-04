@@ -18,8 +18,8 @@ namespace SPTemplateASPDotNetCoreWebAPI.Models
         public bool IsExpired => DateTime.UtcNow >= Expires;
         public DateTime? Revoked { get; set; }
         public bool IsActive => Revoked == null && !IsExpired;
-        public string CreatedByIp { get; set; }
-        public string RevokedByIp { get; set; }
+        //public string CreatedByIp { get; set; }
+        //public string RevokedByIp { get; set; }
         public string ReplacedByToken { get; set; } = string.Empty;
         
     }

@@ -119,6 +119,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
             var refreshToken = user.RefreshTokens.Single(x => x.Token == token);
 
             if (!refreshToken.IsActive) return null;
+  
             // replace old refresh token with a new one and save
             var newRefreshToken = GenerateRefreshToken();
             refreshToken.Revoked = DateTime.UtcNow;
@@ -187,7 +188,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
             var refreshToken = new RefreshToken
             {
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Expires = DateTime.Now.AddDays(2),
+                Expires = DateTime.Now.AddMinutes(60),
                 Created = DateTime.Now,
             };
 
