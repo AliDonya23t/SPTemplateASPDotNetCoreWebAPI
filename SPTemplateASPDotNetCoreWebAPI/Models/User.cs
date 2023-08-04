@@ -26,6 +26,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Models
         public string UserName { get; set; } = string.Empty;
         public byte[] PasswordHash { get; set; }
         public byte[] PasswordSalt { get; set; }
+
         [JsonIgnore]
         public List<RefreshToken> RefreshTokens { get; set; }
     }

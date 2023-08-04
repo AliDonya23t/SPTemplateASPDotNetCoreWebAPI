@@ -15,6 +15,7 @@ using AutoMapper;
 using Azure;
 using Microsoft.EntityFrameworkCore;
 using Azure.Core;
+using System.Net;
 
 namespace SPTemplateASPDotNetCoreWebAPI.Repository
 {
@@ -32,7 +33,10 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
         }
-
+        public User GetById(int id)
+        {
+            return _db.Users.Find(id);
+        }
         public string GetMyName()
         {
             var result = string.Empty;
@@ -57,42 +61,18 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
 
             if (user is null || VerifyPasswordHash(loginRequestDTO.Password, user.PasswordHash, user.PasswordSalt) is false)
             {
-                return new LoginResponseDto()
-                {
-                    Token = "",
-                    User = null
-                };
+                return null;
             }
             //if user was found generate JWT Token
             string token = CreateToken(user);
+            var refreshToken = GenerateRefreshToken();
+            // save refresh token
+            user.RefreshTokens.Add(refreshToken);
+            _db.Update(user);
+            _db.SaveChanges();
 
-            //var refreshToken = GenerateRefreshToken();
-            //SetRefreshToken(refreshToken, user.Id);
-
-            LoginResponseDto loginResponseDTO = new LoginResponseDto()
-            {
-                Token = token,
-                User = _mapper.Map<UserDto>(user),
-                
-                // Role = roles.FirstOrDefault()
-            };
-            //if (user.RefreshTokens.Any(a => a.IsActive))
-            //{
-            //    var activeRefreshToken = user.RefreshTokens.Where(a => a.IsActive == true).FirstOrDefault();
-            //    //user.RefreshTokens.Token = activeRefreshToken.Token;
-            //    //authenticationModel.RefreshTokenExpiration = activeRefreshToken.Expires;
-            //}
-            //else
-            //{
-            //    var refreshToken = GenerateRefreshToken();
-            //    //authenticationModel.RefreshToken = refreshToken.Token;
-            //    //authenticationModel.RefreshTokenExpiration = refreshToken.Expires;
-            //    user.RefreshTokens.Add(refreshToken);
-            //    _db.Update(user);
-            //    _db.SaveChanges();
-            //}
-            return loginResponseDTO;
-
+            return new LoginResponseDto(user, token, refreshToken.Token);
+ 
         }
 
         public async Task<UserDto> Register(RegisterationRequestDto registerationRequestDTO)
@@ -130,50 +110,47 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
                 passwordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
             }
         }
-        public async Task<AuthenticationModel> RefreshTokenAsync(string token)
+        public async Task<LoginResponseDto> RefreshTokenAsync(string token)
         {
-            var authenticationModel = new AuthenticationModel();
-
             var user = _db.Users.SingleOrDefault(u => u.RefreshTokens.Any(t => t.Token == token));
-            if (user is null)
-            {
-                authenticationModel.IsAuthenticated = false;
-                authenticationModel.Message = $"Token did not match any users.";
-                return authenticationModel;
-            }
+
+            if (user is null) return null;
 
             var refreshToken = user.RefreshTokens.Single(x => x.Token == token);
 
-            if (!refreshToken.IsActive)
-            {
-                authenticationModel.IsAuthenticated = false;
-                authenticationModel.Message = $"Token Not Active.";
-                return authenticationModel;
-            }
-
-            //Revoke Current Refresh Token
+            if (!refreshToken.IsActive) return null;
+            // replace old refresh token with a new one and save
+            var newRefreshToken = GenerateRefreshToken();
             refreshToken.Revoked = DateTime.UtcNow;
 
-            //Generate new Refresh Token and save to Database
-            var newRefreshToken = GenerateRefreshToken();
             user.RefreshTokens.Add(newRefreshToken);
             _db.Update(user);
             _db.SaveChanges();
 
-            //Generates new jwt
-            authenticationModel.IsAuthenticated = true;
-            authenticationModel.Token = CreateToken(user);
-            //JwtSecurityToken jwtSecurityToken =  await CreateToken(user);
-            //authenticationModel.Token = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
-            //authenticationModel.Email = user.Email;
-            authenticationModel.UserName = user.UserName;
-            //var rolesList = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
-            //authenticationModel.Roles = rolesList.ToList();
-            authenticationModel.RefreshToken = newRefreshToken.Token;
-            authenticationModel.RefreshTokenExpiration = newRefreshToken.Expires;
-            return authenticationModel;
-        }
+            // generate new jwt
+            var jwtToken = CreateToken(user);
 
+            return new LoginResponseDto(user, jwtToken, newRefreshToken.Token);
+        }
+        public bool RevokeToken(string token)
+        {
+            var user = _db.Users.SingleOrDefault(u => u.RefreshTokens.Any(t => t.Token == token));
+
+            // return false if no user found with token
+            if (user == null) return false;
+
+            var refreshToken = user.RefreshTokens.Single(x => x.Token == token);
+
+            // return false if token is not active
+            if (!refreshToken.IsActive) return false;
+
+            // revoke token and save
+            refreshToken.Revoked = DateTime.UtcNow;
+            _db.Update(user);
+            _db.SaveChanges();
+
+            return true;
+        }
         private string CreateToken(User user)
         {
             List<Claim> claims = new List<Claim>
@@ -189,7 +166,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
 
             var token = new JwtSecurityToken(
                 claims: claims,
-                expires: DateTime.Now.AddDays(1),
+                expires: DateTime.Now.AddMinutes(60),
                 signingCredentials: creds);
 
             var jwt = new JwtSecurityTokenHandler().WriteToken(token);
@@ -210,61 +187,12 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
             var refreshToken = new RefreshToken
             {
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Expires = DateTime.Now.AddMinutes(60),
-                Created = DateTime.Now
+                Expires = DateTime.Now.AddDays(2),
+                Created = DateTime.Now,
             };
 
             return refreshToken;
         }
-        public async Task<AuthenticationModel> GetTokenAsync(UserDto model)
-        {
-            var authenticationModel = new AuthenticationModel();
-            var user = _db.Users.FirstOrDefault(u => u.UserName.ToLower() == model.Username.ToLower());
-
-
-            if (user == null)
-            {
-                authenticationModel.IsAuthenticated = false;
-                authenticationModel.Message = $"No Accounts Registered with {model.Username}.";
-                return authenticationModel;
-            }
-            if (VerifyPasswordHash(model.Password, user.PasswordHash, user.PasswordSalt) is true)
-            {
-                authenticationModel.IsAuthenticated = true;
-                //JwtSecurityToken jwtSecurityToken = await CreateJwtToken(user);
-                //authenticationModel.Token = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
-                authenticationModel.Token =  CreateToken(user);
-                //authenticationModel.Email = user.Email;
-                authenticationModel.UserName = user.UserName;
-                //var rolesList = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
-                //authenticationModel.Roles = rolesList.ToList();
-
-
-                if (user.RefreshTokens.Any(a => a.IsActive))
-                {
-                    var activeRefreshToken = user.RefreshTokens.Where(a => a.IsActive == true).FirstOrDefault();
-                    authenticationModel.RefreshToken = activeRefreshToken.Token;
-                    authenticationModel.RefreshTokenExpiration = activeRefreshToken.Expires;
-                }
-                else
-                {
-                    var refreshToken = GenerateRefreshToken();
-                    authenticationModel.RefreshToken = refreshToken.Token;
-                    authenticationModel.RefreshTokenExpiration = refreshToken.Expires;
-                    user.RefreshTokens.Add(refreshToken);
-                    _db.Update(user);
-                    _db.SaveChanges();
-                }
-
-                return authenticationModel;
-            }
-            authenticationModel.IsAuthenticated = false;
-            authenticationModel.Message = $"Incorrect Credentials for user {user.UserName}.";
-            return authenticationModel;
-        }
-
-
-
 
 
     }   

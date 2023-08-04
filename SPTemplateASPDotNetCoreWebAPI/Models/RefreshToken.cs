@@ -9,7 +9,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Models
     public class RefreshToken
     {
         [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        [JsonIgnore]
         public int Id { get; set; }
         public string Token { get; set; } = string.Empty;
         public DateTime Created { get; set; } = DateTime.Now;
@@ -18,8 +18,10 @@ namespace SPTemplateASPDotNetCoreWebAPI.Models
         public bool IsExpired => DateTime.UtcNow >= Expires;
         public DateTime? Revoked { get; set; }
         public bool IsActive => Revoked == null && !IsExpired;
-        //public int UserId { get; set; }
-        //[ForeignKey(nameof(UserId))]
-        //public User user { get; set; }
+        public string CreatedByIp { get; set; }
+        public string RevokedByIp { get; set; }
+        public string ReplacedByToken { get; set; } = string.Empty;
+        
     }
 }
+     

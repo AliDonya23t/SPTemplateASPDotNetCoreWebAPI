@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SPTemplateASPDotNetCoreWebAPI.Data;
 
@@ -11,9 +12,11 @@ using SPTemplateASPDotNetCoreWebAPI.Data;
 namespace SPTemplateASPDotNetCoreWebAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20230804071004_up10")]
+    partial class up10
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -60,10 +63,6 @@ namespace SPTemplateASPDotNetCoreWebAPI.Migrations
                             b1.Property<DateTime>("Created")
                                 .HasColumnType("datetime2");
 
-                            b1.Property<string>("CreatedByIp")
-                                .IsRequired()
-                                .HasColumnType("nvarchar(max)");
-
                             b1.Property<DateTime>("Expires")
                                 .HasColumnType("datetime2");
 
@@ -73,10 +72,6 @@ namespace SPTemplateASPDotNetCoreWebAPI.Migrations
 
                             b1.Property<DateTime?>("Revoked")
                                 .HasColumnType("datetime2");
-
-                            b1.Property<string>("RevokedByIp")
-                                .IsRequired()
-                                .HasColumnType("nvarchar(max)");
 
                             b1.Property<string>("Token")
                                 .IsRequired()
