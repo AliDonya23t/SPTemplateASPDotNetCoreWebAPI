@@ -141,15 +141,14 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
             }
             return Ok(_response);
         }
-        private void SetRefreshTokenInCookie(RefreshToken refreshToken)
+        private void SetRefreshTokenInCookie(string refreshToken)
         {
             var cookieOptions = new CookieOptions
             {
                 HttpOnly = true,
-                //Expires = DateTime.UtcNow.AddMinutes(60),
-                Expires = refreshToken.Expires
+                Expires = DateTime.UtcNow.AddMinutes(60),
             };
-            Response.Cookies.Append("refreshToken", refreshToken.Token, cookieOptions);
+            Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
         }
         //private string ipAddress()
         //{
