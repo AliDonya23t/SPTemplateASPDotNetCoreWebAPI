@@ -27,7 +27,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
             _userRepo = userRepo;
             _response = new();
         }
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         [HttpGet]
 
         public ActionResult<string> GetMe()
@@ -150,13 +150,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
             };
             Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
         }
-        //private string ipAddress()
-        //{
-        //    if (Request.Headers.ContainsKey("X-Forwarded-For"))
-        //        return Request.Headers["X-Forwarded-For"];
-        //    else
-        //        return HttpContext.Connection.RemoteIpAddress.MapToIPv4().ToString();
-        //}
+        
 
     }
 }

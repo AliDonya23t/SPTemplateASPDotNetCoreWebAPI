@@ -78,13 +78,20 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
         public async Task<UserDto> Register(RegisterationRequestDto registerationRequestDTO)
         {
             CreatePasswordHash(registerationRequestDTO.Password, out byte[] passwordHash, out byte[] passwordSalt);
+            
             User userNew = new()
             {
                 UserName = registerationRequestDTO.UserName,
-                //Name = registerationRequestDTO.Name,
+                Name = registerationRequestDTO.Name,
+                //Role = registerationRequestDTO.Role,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt
             };
+            if (registerationRequestDTO.Role.ToLower() == "admin")
+                userNew.Role = "Admin";
+            else
+                userNew.Role = "Member";
+
             try
             {
 
@@ -123,7 +130,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
             // replace old refresh token with a new one and save
             var newRefreshToken = GenerateRefreshToken();
             refreshToken.Revoked = DateTime.UtcNow;
-
+            refreshToken.ReplacedByToken = newRefreshToken.Token;
             user.RefreshTokens.Add(newRefreshToken);
             _db.Update(user);
             _db.SaveChanges();
@@ -157,7 +164,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
             List<Claim> claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, user.UserName.ToString()),
-                new Claim(ClaimTypes.Role, "Admin")
+                new Claim(ClaimTypes.Role, user.Role.ToString())
             };
 
             var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8

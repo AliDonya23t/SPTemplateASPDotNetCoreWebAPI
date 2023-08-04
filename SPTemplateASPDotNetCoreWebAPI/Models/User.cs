@@ -23,7 +23,10 @@ namespace SPTemplateASPDotNetCoreWebAPI.Models
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
+        [Required]
         public string UserName { get; set; } = string.Empty;
+        public string Name { get; set; }
+        public string Role { get; set; } = "Member";
         public byte[] PasswordHash { get; set; }
         public byte[] PasswordSalt { get; set; }
 
