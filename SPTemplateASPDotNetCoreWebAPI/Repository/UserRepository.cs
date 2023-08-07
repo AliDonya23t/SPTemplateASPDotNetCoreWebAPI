@@ -16,6 +16,7 @@ using Azure;
 using Microsoft.EntityFrameworkCore;
 using Azure.Core;
 using System.Net;
+using System.Text;
 
 namespace SPTemplateASPDotNetCoreWebAPI.Repository
 {
@@ -57,28 +58,28 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
         }
         public async Task<LoginResponseDto> Login(LoginRequestDto loginRequestDTO)
         {
-            var user = _db.Users.FirstOrDefault(u => u.UserName.ToLower() == loginRequestDTO.UserName.ToLower());
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == loginRequestDTO.UserName.ToLower());
 
             if (user is null || VerifyPasswordHash(loginRequestDTO.Password, user.PasswordHash, user.PasswordSalt) is false)
             {
                 return null;
             }
-            //if user was found generate JWT Token
-            string token = CreateToken(user);
+            //if user was found generate JWT Token (Access token)
+            string token = generateJwtToken(user);
             var refreshToken = GenerateRefreshToken();
             // save refresh token
             user.RefreshTokens.Add(refreshToken);
             _db.Update(user);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             return new LoginResponseDto(user, token, refreshToken.Token);
- 
-        }
 
+        }
+        
         public async Task<UserDto> Register(RegisterationRequestDto registerationRequestDTO)
         {
             CreatePasswordHash(registerationRequestDTO.Password, out byte[] passwordHash, out byte[] passwordSalt);
-            
+
             User userNew = new()
             {
                 UserName = registerationRequestDTO.UserName,
@@ -114,29 +115,29 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
             using (var hmac = new HMACSHA512())
             {
                 passwordSalt = hmac.Key;
-                passwordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+                passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
             }
         }
         public async Task<LoginResponseDto> RefreshTokenAsync(string token)
         {
-            var user = _db.Users.SingleOrDefault(u => u.RefreshTokens.Any(t => t.Token == token));
+            var user = await _db.Users.SingleOrDefaultAsync(u => u.RefreshTokens.Any(t => t.Token == token));
 
             if (user is null) return null;
 
             var refreshToken = user.RefreshTokens.Single(x => x.Token == token);
 
             if (!refreshToken.IsActive) return null;
-  
+
             // replace old refresh token with a new one and save
             var newRefreshToken = GenerateRefreshToken();
             refreshToken.Revoked = DateTime.UtcNow;
             refreshToken.ReplacedByToken = newRefreshToken.Token;
             user.RefreshTokens.Add(newRefreshToken);
             _db.Update(user);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             // generate new jwt
-            var jwtToken = CreateToken(user);
+            var jwtToken = generateJwtToken(user);
 
             return new LoginResponseDto(user, jwtToken, newRefreshToken.Token);
         }
@@ -159,34 +160,32 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
 
             return true;
         }
-        private string CreateToken(User user)
+        private string generateJwtToken(User user)
         {
-            List<Claim> claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, user.UserName.ToString()),
-                new Claim(ClaimTypes.Role, user.Role.ToString())
-            };
-
-            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = new SymmetricSecurityKey(Encoding.UTF8
                 .GetBytes(_configuration.GetSection("AppSettings:Token").Value));
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new Claim[]
+                {
+                    new Claim(ClaimTypes.Name, user.UserName.ToString()),
+                    new Claim(ClaimTypes.Role, user.Role.ToString())
+                }),
+                Expires = DateTime.UtcNow.AddMinutes(15),
 
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
-
-            var token = new JwtSecurityToken(
-                claims: claims,
-                expires: DateTime.Now.AddMinutes(60),
-                signingCredentials: creds);
-
-            var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-
-            return jwt;
+                SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature),
+                
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
         private bool VerifyPasswordHash(string password, byte[] passwordHash, byte[] passwordSalt)
         {
             //For check pass
             using (var hmac = new HMACSHA512(passwordSalt))
             {
-                var computedHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+                var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
                 return computedHash.SequenceEqual(passwordHash);
             }
         }
@@ -201,7 +200,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Repository
 
             return refreshToken;
         }
+   
 
-
-    }   
+    }
 }

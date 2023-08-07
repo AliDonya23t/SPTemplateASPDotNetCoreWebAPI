@@ -12,6 +12,7 @@ using System.Net;
 using SPTemplateASPDotNetCoreWebAPI.Repository.IRepository;
 using Microsoft.AspNetCore.Http.HttpResults;
 using System;
+using System.Linq;
 
 namespace SPTemplateASPDotNetCoreWebAPI.Controllers
 {
@@ -19,7 +20,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        
+
         private readonly IUserRepository _userRepo;
         protected APIResponse _response;
         public AuthController(IUserRepository userRepo)
@@ -35,7 +36,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
             var userName = _userRepo.GetMyName();
             return Ok(userName);
         }
-        
+
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterationRequestDto model)
         {
@@ -62,7 +63,7 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login( LoginRequestDto model)
+        public async Task<IActionResult> Login(LoginRequestDto model)
         {
             var loginResponse = await _userRepo.Login(model);
             if (loginResponse is null /*|| string.IsNullOrEmpty(loginResponse.JwtToken)*/)
@@ -79,14 +80,14 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
             return Ok(_response);
         }
 
-      
+
         [HttpPost("refresh-token")]
         // login with token  then refresh, now you have to enter with the refreshed token next time
         public async Task<IActionResult> RefreshToken()
         {
             var refreshToken = Request.Cookies["refreshToken"];
             var RefreshTokenresponse = await _userRepo.RefreshTokenAsync(refreshToken);
-            if (RefreshTokenresponse is null )
+            if (RefreshTokenresponse is null)
             {
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
@@ -134,7 +135,8 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
                 _response.ErrorMessages.Add("Token not found");
                 return BadRequest(_response);
             }
-            else { 
+            else
+            {
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Result = response;
@@ -146,11 +148,9 @@ namespace SPTemplateASPDotNetCoreWebAPI.Controllers
             var cookieOptions = new CookieOptions
             {
                 HttpOnly = true,
-                Expires = DateTime.UtcNow.AddMinutes(60),
+                Expires = DateTime.UtcNow.AddMinutes(60)                
             };
             Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
         }
-        
-
     }
 }
